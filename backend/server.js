@@ -9,24 +9,15 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:3000",
-  process.env.FRONTEND_URL,
-].filter(Boolean);
+  "https://fiaxe-agent.onrender.com",
+];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // allow requests with no origin (postman, mobile apps, server-to-server)
-      if (!origin) return callback(null, true);
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error(`CORS not allowed for origin: ${origin}`));
-    },
-    credentials: true,
-  })
-);
+app.options("*", cors());
 
 app.use(express.json());
 
