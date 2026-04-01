@@ -21,7 +21,6 @@ export const sendVoice = (formData: FormData) =>
       "Content-Type": "multipart/form-data",
       Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
     },
-    responseType: "blob",
   });
 
 export default API;

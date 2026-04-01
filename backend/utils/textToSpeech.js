@@ -5,22 +5,36 @@ const textToSpeech = async (text) => {
     const response = await axios.post(
       "https://api.sarvam.ai/text-to-speech",
       {
-        text: text,
-        voice: "anushka",
+        text,
+        model: "bulbul:v3",
+        target_language_code: "en-IN",
+        speaker: "simran", // ✅ your voice
       },
       {
         headers: {
-          "api-key": process.env.SARVAM_API_KEY,
+          "api-subscription-key": process.env.SARVAM_API_KEY,
           "Content-Type": "application/json",
         },
-        responseType: "arraybuffer",
       }
     );
 
-    return response.data; // audio buffer
+    // ✅ Sarvam returns base64 audio inside "audios"
+    const audioBase64 = response?.data?.audios?.[0];
+
+    if (!audioBase64) {
+      console.error("Sarvam bad response:", response.data);
+      throw new Error("No audio returned from Sarvam");
+    }
+
+    return {
+      audioBase64,
+      audioMimeType: "audio/wav", // usually wav
+    };
   } catch (error) {
-    console.log(error);
-    throw new Error("TTS failed");
+    console.error("Sarvam status:", error?.response?.status);
+    console.error("Sarvam error:", error?.response?.data || error.message);
+
+    throw new Error("Text-to-speech failed");
   }
 };
 
