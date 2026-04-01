@@ -7,12 +7,27 @@ dotenv.config();
 
 const app = express();
 
+const allowedOrigins = [
+  "http://localhost:3000",
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: function (origin, callback) {
+      // allow requests with no origin (postman, mobile apps, server-to-server)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS not allowed for origin: ${origin}`));
+    },
     credentials: true,
   })
 );
+
 app.use(express.json());
 
 mongoose
@@ -27,7 +42,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api/ai", aiRoutes);
 
 app.get("/", (req, res) => {
-  res.send("API is running...");
+  res.status(200).json({
+    success: true,
+    message: "API is running...",
+  });
 });
 
 const PORT = process.env.PORT || 5000;
