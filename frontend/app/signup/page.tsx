@@ -16,26 +16,68 @@ export default function SignupPage() {
 
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErrorMessage("");
+
     setFormData((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
     }));
   };
 
+  const validateForm = () => {
+    const trimmedName = formData.name.trim();
+    const trimmedEmail = formData.email.trim();
+    const trimmedPassword = formData.password.trim();
+
+    if (!trimmedName || !trimmedEmail || !trimmedPassword) {
+      return "All fields are required";
+    }
+
+    if (trimmedName.length < 2) {
+      return "Name must be at least 2 characters";
+    }
+
+    if (!/\S+@\S+\.\S+/.test(trimmedEmail)) {
+      return "Please enter a valid email address";
+    }
+
+    if (trimmedPassword.length < 6) {
+      return "Password must be at least 6 characters";
+    }
+
+    if (!agree) {
+      return "Please accept terms first";
+    }
+
+    return "";
+  };
+
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!agree) {
-      alert("Please accept terms first");
+    if (loading) return;
+
+    const validationError = validateForm();
+
+    if (validationError) {
+      setErrorMessage(validationError);
       return;
     }
 
     try {
       setLoading(true);
+      setErrorMessage("");
 
-      const res = await signupUser(formData);
+      const payload = {
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password.trim(),
+      };
+
+      const res = await signupUser(payload);
 
       if (res?.data?.token) {
         localStorage.setItem("token", res.data.token);
@@ -45,10 +87,15 @@ export default function SignupPage() {
         localStorage.setItem("user", JSON.stringify(res.data.user));
       }
 
-      alert("Signup successful");
       router.push("/ai");
     } catch (error: any) {
-      alert(error?.response?.data?.message || "Signup failed");
+      console.error("Signup failed:", error?.response?.data || error.message);
+
+      setErrorMessage(
+        error?.response?.data?.message ||
+          error?.response?.data?.error ||
+          "Signup failed. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -101,31 +148,37 @@ export default function SignupPage() {
           <div className="p-8">
             <div className="space-y-4">
               <input
+                suppressHydrationWarning
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="👤 Name"
                 required
+                autoComplete="name"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-slate-400 text-slate-700"
               />
 
               <input
+                suppressHydrationWarning
                 name="email"
                 type="email"
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="✉️ Email Address"
                 required
+                autoComplete="email"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-slate-400 text-slate-700"
               />
 
               <input
+                suppressHydrationWarning
                 name="password"
                 type="password"
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="🔑 Password"
                 required
+                autoComplete="new-password"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 outline-none focus:border-slate-400 text-slate-700"
               />
             </div>
@@ -134,7 +187,10 @@ export default function SignupPage() {
               <input
                 type="checkbox"
                 checked={agree}
-                onChange={(e) => setAgree(e.target.checked)}
+                onChange={(e) => {
+                  setAgree(e.target.checked);
+                  setErrorMessage("");
+                }}
                 className="mt-1 h-4 w-4"
               />
               <span className="text-sm text-slate-500">
@@ -142,7 +198,14 @@ export default function SignupPage() {
               </span>
             </label>
 
+            {errorMessage && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                {errorMessage}
+              </div>
+            )}
+
             <button
+              suppressHydrationWarning
               type="submit"
               disabled={loading}
               className="w-full mt-8 rounded-xl bg-slate-800 px-4 py-4 font-bold text-white hover:bg-slate-900 shadow-lg disabled:opacity-50 transition-all"

@@ -7,24 +7,25 @@ dotenv.config();
 
 const app = express();
 
-// middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  })
+);
 app.use(express.json());
 
-// connect DB
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
-  .catch((err) => console.log(err));
+  .catch((err) => console.log("MongoDB Error:", err));
 
-// routes
 const authRoutes = require("./routes/authRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/ai", aiRoutes);
 
-// test route
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
