@@ -7,15 +7,21 @@ dotenv.config();
 
 const app = express();
 
-/* ================= CORS ================= */
-app.use(
-  cors({
-    origin: "https://fiaxe-agent-front.onrender.com",
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+/* ================= CORS (ALLOW ALL) ================= */
+app.use(cors()); // 🔥 allows all origins
+
+// extra safety for preflight (some setups need this)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+
+  next();
+});
 
 /* ================= DEBUG LOGGER ================= */
 app.use((req, res, next) => {
