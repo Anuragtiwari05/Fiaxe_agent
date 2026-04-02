@@ -12,7 +12,18 @@ type LoginData = {
   password: string;
 };
 
+function parseErrorMessage(result: any, fallback: string) {
+  return (
+    result?.error ||
+    result?.message ||
+    fallback
+  );
+}
+
 export async function signupUser(data: SignupData) {
+  console.log("BASE_URL:", BASE_URL);
+  console.log("Signup payload:", data);
+
   const res = await fetch(`${BASE_URL}/api/auth/signup`, {
     method: "POST",
     headers: {
@@ -23,14 +34,20 @@ export async function signupUser(data: SignupData) {
 
   const result = await res.json();
 
+  console.log("Signup status:", res.status);
+  console.log("Signup result:", result);
+
   if (!res.ok) {
-    throw new Error(result.message || "Signup failed");
+    throw new Error(parseErrorMessage(result, "Signup failed"));
   }
 
   return result;
 }
 
 export async function loginUser(data: LoginData) {
+  console.log("BASE_URL:", BASE_URL);
+  console.log("Login payload:", data);
+
   const res = await fetch(`${BASE_URL}/api/auth/login`, {
     method: "POST",
     headers: {
@@ -41,14 +58,20 @@ export async function loginUser(data: LoginData) {
 
   const result = await res.json();
 
+  console.log("Login status:", res.status);
+  console.log("Login result:", result);
+
   if (!res.ok) {
-    throw new Error(result.message || "Login failed");
+    throw new Error(parseErrorMessage(result, "Login failed"));
   }
 
   return result;
 }
 
 export async function sendVoice(formData: FormData, token?: string) {
+  console.log("BASE_URL:", BASE_URL);
+  console.log("Sending voice request...");
+
   const res = await fetch(`${BASE_URL}/api/ai/voice`, {
     method: "POST",
     headers: token
@@ -61,8 +84,11 @@ export async function sendVoice(formData: FormData, token?: string) {
 
   const result = await res.json();
 
+  console.log("Voice status:", res.status);
+  console.log("Voice result:", result);
+
   if (!res.ok) {
-    throw new Error(result.message || "Voice request failed");
+    throw new Error(parseErrorMessage(result, "Voice request failed"));
   }
 
   return result;

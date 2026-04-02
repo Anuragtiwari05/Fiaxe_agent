@@ -21,13 +21,26 @@ export default function AIPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<BlobPart[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldContinueRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
+  const getToken = () => {
+    if (typeof window === "undefined") return "";
 
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/login");
+      return "";
+    }
+
+    return token;
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const token = localStorage.getItem("token");
     if (!token) {
       router.push("/login");
     } else {
@@ -39,13 +52,23 @@ export default function AIPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleLogout = () => {
-    shouldContinueRef.current = false;
+  const cleanupStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+  };
 
+  const clearSilenceTimer = () => {
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
+  };
+
+  const handleLogout = () => {
+    shouldContinueRef.current = false;
+    clearSilenceTimer();
 
     if (
       mediaRecorderRef.current &&
@@ -54,21 +77,15 @@ export default function AIPage() {
       mediaRecorderRef.current.stop();
     }
 
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
+    cleanupStream();
+
+    if (typeof window !== "undefined") {
+      window.speechSynthesis.cancel();
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
     }
 
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
     router.push("/login");
-  };
-
-  const cleanupStream = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
   };
 
   const playBase64Audio = async (
@@ -76,6 +93,8 @@ export default function AIPage() {
     mimeType: string = "audio/wav",
     onEndedCallback?: () => void
   ) => {
+    let audioUrl = "";
+
     try {
       const byteCharacters = atob(base64Audio);
       const byteNumbers = new Array(byteCharacters.length);
@@ -86,7 +105,7 @@ export default function AIPage() {
 
       const byteArray = new Uint8Array(byteNumbers);
       const audioBlob = new Blob([byteArray], { type: mimeType });
-      const audioUrl = URL.createObjectURL(audioBlob);
+      audioUrl = URL.createObjectURL(audioBlob);
 
       const audio = new Audio(audioUrl);
 
@@ -105,8 +124,35 @@ export default function AIPage() {
         }
       };
 
+      audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "agent",
+            text: "🔇 AI reply came, but audio could not be played.",
+          },
+        ]);
+
+        if (onEndedCallback) {
+          onEndedCallback();
+          return;
+        }
+
+        if (shouldContinueRef.current) {
+          setTimeout(() => {
+            startRecording(true);
+          }, 400);
+        }
+      };
+
       await audio.play();
     } catch (audioError) {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+
       console.error("Audio playback failed:", audioError);
 
       setMessages((prev) => [
@@ -133,56 +179,52 @@ export default function AIPage() {
   const speakIntroAndStart = async () => {
     const introText = "Hi, I'm Simran. How can I help you today?";
 
-    setMessages((prev) => [
-      ...prev,
-      { role: "agent", text: introText },
-    ]);
-
+    setMessages((prev) => [...prev, { role: "agent", text: introText }]);
     setHasIntroduced(true);
 
     try {
       setLoading(true);
 
-      const introRes = await sendVoice(
-        (() => {
-          const formData = new FormData();
-          const emptyBlob = new Blob(["intro"], { type: "text/plain" });
-          formData.append("audio", emptyBlob, "intro.txt");
-          return formData;
-        })()
-      );
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
 
-      if (
-        introRes?.data?.audio &&
-        typeof introRes.data.audio === "string"
-      ) {
-        const mimeType =
-          typeof introRes?.data?.audioMimeType === "string" &&
-          introRes.data.audioMimeType.trim()
-            ? introRes.data.audioMimeType
-            : "audio/wav";
+        const utterance = new SpeechSynthesisUtterance(introText);
+        utterance.rate = 1;
+        utterance.pitch = 1;
 
-        await playBase64Audio(introRes.data.audio, mimeType, () => {
+        utterance.onend = () => {
+          setLoading(false);
           setTimeout(() => {
             startRecording(true);
           }, 400);
-        });
-      } else {
-        setTimeout(() => {
-          startRecording(true);
-        }, 400);
+        };
+
+        utterance.onerror = () => {
+          setLoading(false);
+          setTimeout(() => {
+            startRecording(true);
+          }, 400);
+        };
+
+        window.speechSynthesis.speak(utterance);
+        return;
       }
-    } catch {
+
+      setLoading(false);
       setTimeout(() => {
         startRecording(true);
       }, 400);
-    } finally {
+    } catch (error) {
+      console.error("Intro playback failed:", error);
       setLoading(false);
+      setTimeout(() => {
+        startRecording(true);
+      }, 400);
     }
   };
 
   const startRecording = async (skipIntro = false) => {
-    if (loading) return;
+    if (loading || recording) return;
 
     if (!hasIntroduced && !skipIntro) {
       shouldContinueRef.current = true;
@@ -192,6 +234,7 @@ export default function AIPage() {
 
     try {
       shouldContinueRef.current = true;
+      clearSilenceTimer();
       setRecording(true);
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -208,10 +251,7 @@ export default function AIPage() {
       };
 
       mediaRecorder.onstop = async () => {
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
-        }
+        clearSilenceTimer();
 
         try {
           setLoading(true);
@@ -223,7 +263,13 @@ export default function AIPage() {
           cleanupStream();
 
           if (audioBlob.size < 2000) {
-            setRecording(false);
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "agent",
+                text: "❌ Audio was too short. Please speak clearly and try again.",
+              },
+            ]);
             shouldContinueRef.current = false;
             return;
           }
@@ -231,11 +277,19 @@ export default function AIPage() {
           const formData = new FormData();
           formData.append("audio", audioBlob, "voice.webm");
 
-          const res = await sendVoice(formData);
+          const token = getToken();
+          if (!token) {
+            shouldContinueRef.current = false;
+            return;
+          }
+
+          const res = await sendVoice(formData, token);
 
           const transcript =
-            typeof res?.data?.transcript === "string" &&
-            res.data.transcript.trim()
+            typeof res?.transcript === "string" && res.transcript.trim()
+              ? res.transcript
+              : typeof res?.data?.transcript === "string" &&
+                res.data.transcript.trim()
               ? res.data.transcript
               : "Could not understand your voice clearly.";
 
@@ -246,7 +300,9 @@ export default function AIPage() {
           ]);
 
           const replyText =
-            typeof res?.data?.reply === "string" && res.data.reply.trim()
+            typeof res?.reply === "string" && res.reply.trim()
+              ? res.reply
+              : typeof res?.data?.reply === "string" && res.data.reply.trim()
               ? res.data.reply
               : "AI responded successfully, but no reply text was returned.";
 
@@ -259,27 +315,34 @@ export default function AIPage() {
             return updated;
           });
 
-          if (res?.data?.audio && typeof res.data.audio === "string") {
-            const mimeType =
-              typeof res?.data?.audioMimeType === "string" &&
-              res.data.audioMimeType.trim()
-                ? res.data.audioMimeType
-                : "audio/wav";
+          const audioBase64 =
+            typeof res?.audio === "string" && res.audio.trim()
+              ? res.audio
+              : typeof res?.data?.audio === "string" && res.data.audio.trim()
+              ? res.data.audio
+              : "";
 
-            await playBase64Audio(res.data.audio, mimeType);
-          } else {
-            if (shouldContinueRef.current) {
-              setTimeout(() => {
-                startRecording(true);
-              }, 400);
-            }
+          const audioMimeType =
+            typeof res?.audioMimeType === "string" && res.audioMimeType.trim()
+              ? res.audioMimeType
+              : typeof res?.data?.audioMimeType === "string" &&
+                res.data.audioMimeType.trim()
+              ? res.data.audioMimeType
+              : "audio/wav";
+
+          if (audioBase64) {
+            await playBase64Audio(audioBase64, audioMimeType);
+          } else if (shouldContinueRef.current) {
+            setTimeout(() => {
+              startRecording(true);
+            }, 400);
           }
         } catch (error: any) {
           console.error("Voice request failed:", error);
 
           const errorMessage =
-            typeof error?.response?.data?.message === "string"
-              ? error.response.data.message
+            error?.message && typeof error.message === "string"
+              ? error.message
               : "Voice request failed. Please try again.";
 
           setMessages((prev) => [
@@ -287,10 +350,10 @@ export default function AIPage() {
             { role: "agent", text: `❌ ${errorMessage}` },
           ]);
 
-          setRecording(false);
           shouldContinueRef.current = false;
         } finally {
           setLoading(false);
+          setRecording(false);
         }
       };
 
@@ -303,10 +366,11 @@ export default function AIPage() {
         ) {
           mediaRecorderRef.current.stop();
         }
-      }, 5000);
+      }, 7000);
     } catch (error) {
       console.error("Microphone permission denied:", error);
       cleanupStream();
+      clearSilenceTimer();
       setRecording(false);
       shouldContinueRef.current = false;
 
@@ -322,11 +386,7 @@ export default function AIPage() {
 
   const stopRecording = () => {
     shouldContinueRef.current = false;
-
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-    }
+    clearSilenceTimer();
 
     if (
       mediaRecorderRef.current &&
