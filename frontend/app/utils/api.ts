@@ -21,8 +21,7 @@ function parseErrorMessage(result: any, fallback: string) {
 }
 
 export async function signupUser(data: SignupData) {
-  console.log("BASE_URL:", BASE_URL);
-  console.log("Signup payload:", data);
+  
 
   const res = await fetch(`${BASE_URL}/api/auth/signup`, {
     method: "POST",
@@ -34,8 +33,7 @@ export async function signupUser(data: SignupData) {
 
   const result = await res.json();
 
-  console.log("Signup status:", res.status);
-  console.log("Signup result:", result);
+  
 
   if (!res.ok) {
     throw new Error(parseErrorMessage(result, "Signup failed"));
