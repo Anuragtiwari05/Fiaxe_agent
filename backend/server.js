@@ -7,29 +7,23 @@ dotenv.config();
 
 const app = express();
 
-/* ================= CORS SETUP ================= */
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://fiaxe-agent-front.onrender.com",
-];
+/* ================= CORS ================= */
+app.use(
+  cors({
+    origin: "https://fiaxe-agent-front.onrender.com",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    // allow requests with no origin like Postman / server-to-server
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error("Not allowed by CORS"));
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
-
-app.use(cors(corsOptions));
+/* ================= DEBUG LOGGER ================= */
+app.use((req, res, next) => {
+  console.log("METHOD:", req.method);
+  console.log("ORIGIN:", req.headers.origin);
+  console.log("PATH:", req.path);
+  next();
+});
 
 /* ================= MIDDLEWARE ================= */
 app.use(express.json());
@@ -57,7 +51,7 @@ app.get("/", (req, res) => {
 
 /* ================= ERROR HANDLER ================= */
 app.use((err, req, res, next) => {
-  console.error(err.message);
+  console.error("ERROR:", err);
   res.status(500).json({
     success: false,
     message: err.message || "Server Error",
