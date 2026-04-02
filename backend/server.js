@@ -9,7 +9,7 @@ const app = express();
 app.use((req, res, next) => {
   const allowedOrigins = [
     "http://localhost:3000",
-    "https://fiaxe-agent.onrender.com",
+    "https://fiaxe-agent-front.onrender.com",
   ];
 
   const origin = req.headers.origin;

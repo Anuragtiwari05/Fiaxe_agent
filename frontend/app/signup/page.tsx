@@ -56,50 +56,46 @@ export default function SignupPage() {
   };
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (loading) return;
+  if (loading) return;
 
-    const validationError = validateForm();
+  const validationError = validateForm();
 
-    if (validationError) {
-      setErrorMessage(validationError);
-      return;
+  if (validationError) {
+    setErrorMessage(validationError);
+    return;
+  }
+
+  try {
+    setLoading(true);
+    setErrorMessage("");
+
+    const payload = {
+      name: formData.name.trim(),
+      email: formData.email.trim().toLowerCase(),
+      password: formData.password.trim(),
+    };
+
+    const res = await signupUser(payload);
+
+    if (res?.token) {
+      localStorage.setItem("token", res.token);
     }
 
-    try {
-      setLoading(true);
-      setErrorMessage("");
-
-      const payload = {
-        name: formData.name.trim(),
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password.trim(),
-      };
-
-      const res = await signupUser(payload);
-
-      if (res?.data?.token) {
-        localStorage.setItem("token", res.data.token);
-      }
-
-      if (res?.data?.user) {
-        localStorage.setItem("user", JSON.stringify(res.data.user));
-      }
-
-      router.push("/ai");
-    } catch (error: any) {
-      console.error("Signup failed:", error?.response?.data || error.message);
-
-      setErrorMessage(
-        error?.response?.data?.message ||
-          error?.response?.data?.error ||
-          "Signup failed. Please try again."
-      );
-    } finally {
-      setLoading(false);
+    if (res?.user) {
+      localStorage.setItem("user", JSON.stringify(res.user));
     }
-  };
+
+    router.push("/ai");
+  } catch (error: any) {
+    console.error("Signup failed:", error.message);
+
+    setErrorMessage(error.message || "Signup failed. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <main className="min-h-screen bg-[#F8FAFC]">
