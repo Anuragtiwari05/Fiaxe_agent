@@ -23,7 +23,7 @@ app.use(
   })
 );
 
-app.options("*", cors());
+
 
 /* ================= MIDDLEWARE ================= */
 console.log("⚙️ Applying middleware...");
