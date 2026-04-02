@@ -14,25 +14,21 @@ const app = express();
 
 /* ================= CORS ================= */
 console.log("⚙️ Setting up CORS...");
-app.use(cors());
 
-app.use((req, res, next) => {
-  console.log("🌐 CORS Middleware hit");
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-  if (req.method === "OPTIONS") {
-    console.log("⚡ Preflight request handled");
-    return res.sendStatus(200);
-  }
-
-  next();
-});
+app.options("*", cors());
 
 /* ================= MIDDLEWARE ================= */
-console.log("⚙️ Applying JSON middleware...");
+console.log("⚙️ Applying middleware...");
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 /* ================= DEBUG LOGGER ================= */
 app.use((req, res, next) => {
@@ -63,6 +59,13 @@ app.get("/", (req, res) => {
   res.json({
     success: true,
     message: "API is running...",
+  });
+});
+
+app.get("/api/health", (req, res) => {
+  res.json({
+    success: true,
+    message: "Backend running",
   });
 });
 
@@ -107,7 +110,6 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
-
   } catch (error) {
     console.error("❌ MongoDB Connection Error:");
     console.error(error);
